@@ -25,10 +25,6 @@ class MatchWorker(object):
                    "limit :limit offset :offset")
         return conn.execute(sql, limit=limit, offset=offset).fetchall()
 
-    def test(self, msg):
-        print(msg)
-        return msg
-
     def match(self, start_external, end_external, start_internal=0):
         print('Matching from start: {} end: {}'.format(
             start_external, end_external))
@@ -38,6 +34,7 @@ class MatchWorker(object):
                 conn,
                 end_external - start_external,
                 start_external)
+
             start_time = time.time()
             for i in range(len(external)):
                 for j in range(start_internal, len(internal)):
@@ -52,9 +49,10 @@ class MatchWorker(object):
                             internos_sn_id=internal[j]['internos_sn_id'],
                             externos_sn_id=external[i]['externos_sn_id'],
                             match_score=score))
-                print('External progress: {}/{} ({:.4%}) Start: {} End: {} Running time: {}'.format(
-                    i, len(external), i/len(external), start_external, end_external, self._get_elapsed_time(start_time)))
-                start_internal = 0
+                if i % 20 == 0:
+                    print('External progress: {}/{} ({:.4%}) Start: {} End: {} Running time: {}'.format(
+                        i, len(external), i/len(external), start_external, end_external, self._get_elapsed_time(start_time)))
+                    start_internal = 0
 
     def _get_elapsed_time(self, start_time):
         seconds = int(time.time() - start_time)
@@ -89,7 +87,7 @@ class WorkerManager(object):
                     matcher.match, start, start + externals_per_worker))
 
 
-manager = WorkerManager(2)
+manager = WorkerManager(3)
 manager.run()
 
 """ matcher = MatchWorker()
