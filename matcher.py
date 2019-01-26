@@ -1,54 +1,59 @@
+import os
 import time
+import math
 from time import sleep
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor
 from db_manager import DBManager
+from sqlalchemy.sql import text
 from fuzzywuzzy import fuzz
 from dao_objects import PossibleMatches, Progress
 
 
 class MatchWorker(object):
 
-    def load_internal_clients(self):
-        sql = ("select internos_sn_id, " +
-               "nombre " +
-               "from internos_sn ")
-        return pd.read_sql(sql, con=DBManager.get_engine())
+    def load_internal_clients(self, conn):
+        sql = text("select internos_sn_id, "
+                   "nombre "
+                   "from internos_sn ")
+        return conn.execute(sql).fetchall()
 
-    def load_external_clients(self, limit, offset):
-        sql = ("select externos_sn_id, " +
-               "nombre " +
-               "from externos_sn " +
-               "limit {} offset {}".format(limit, offset))
-        return pd.read_sql(sql, con=DBManager.get_engine())
+    def load_external_clients(self, conn, limit, offset):
+        sql = text("select externos_sn_id, "
+                   "nombre "
+                   "from externos_sn "
+                   "limit :limit offset :offset")
+        return conn.execute(sql, limit=limit, offset=offset).fetchall()
 
     def test(self, msg):
         print(msg)
         return msg
 
     def match(self, start_external, end_external, start_internal=0):
-        print('Matching...')
-        internal = self.load_internal_clients()
-        external = self.load_external_clients(
-            end_external - start_external, start_external)
+        print('Matching from start: {} end: {}'.format(
+            start_external, end_external))
         with DBManager.get_engine().connect() as conn:
+            internal = self.load_internal_clients(conn)
+            external = self.load_external_clients(
+                conn,
+                end_external - start_external,
+                start_external)
             start_time = time.time()
-            for i in range(0, len(external)):
+            for i in range(len(external)):
                 for j in range(start_internal, len(internal)):
-                    external_name = external.iloc[i]['nombre']
-                    internal_name = internal.iloc[j]['nombre']
+                    external_name = external[i]['nombre']
+                    internal_name = internal[j]['nombre']
                     score = fuzz.token_set_ratio(
                         internal_name, external_name)
                     if score > 85:
-                        print(score, internal_name, external_name)
+                        print('Possible match, score: {} internal: {} external: {}'.format(
+                            score, internal_name, external_name))
                         conn.execute(PossibleMatches.get_table().insert().values(
-                            internos_sn_id=internal.iloc[j]['internos_sn_id'].item(
-                            ),
-                            externos_sn_id=external.iloc[i]['externos_sn_id'].item(
-                            ),
+                            internos_sn_id=internal[j]['internos_sn_id'],
+                            externos_sn_id=external[i]['externos_sn_id'],
                             match_score=score))
-                print('External progress: {}/{} ({:.4%}) Running time: {}'.format(
-                    i, len(external), i/len(external), self._get_elapsed_time(start_time)))
+                print('External progress: {}/{} ({:.4%}) Start: {} End: {} Running time: {}'.format(
+                    i, len(external), i/len(external), start_external, end_external, self._get_elapsed_time(start_time)))
                 start_internal = 0
 
     def _get_elapsed_time(self, start_time):
@@ -60,24 +65,35 @@ class MatchWorker(object):
         return '{} hrs {} mins {} secs'.format(hrs, mins, secs)
 
 
-""" class MatchWorker(object):
+class WorkerManager(object):
+
+    def __init__(self, num_workers=8):
+        self._num_workers = num_workers
+
+    def _count_externals(self, conn):
+        sql = text("select count(*) externals_count "
+                   "from externos_sn ")
+        return conn.execute(sql).fetchone()['externals_count']
 
     def run(self):
-        with ProcessPoolExecutor(max_workers=2) as executor:
-            future = executor.submit(self.test, 'hola')
-            future2 = executor.submit(self.test, 'adios')
-            print('Is running', future.running())
-            sleep(5)
-            print(future.result())
-            print(future2.result())
+        num_externals = None
+        with DBManager.get_engine().connect() as conn:
+            num_externals = self._count_externals(conn)
+        matcher = MatchWorker()
+        externals_per_worker = math.ceil(num_externals / self._num_workers)
+        workers = []
+        with ProcessPoolExecutor(max_workers=self._num_workers) as executor:
+            for i in range(self._num_workers):
+                start = i * externals_per_worker
+                workers.append(executor.submit(
+                    matcher.match, start, start + externals_per_worker))
 
-    def test(self, msg):
-        print(msg)
-        return msg """
 
+manager = WorkerManager(2)
+manager.run()
 
-matcher = MatchWorker()
-matcher.match(500, 550)
+""" matcher = MatchWorker()
+matcher.match(500, 550) """
 """ with ProcessPoolExecutor(max_workers=2) as executor:
     future = executor.submit(matcher.match)
     future2 = executor.submit(matcher.match)
