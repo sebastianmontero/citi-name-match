@@ -13,9 +13,9 @@ class BaseTable():
 class Progress(Base, BaseTable):
     __tablename__ = 'progress'
     progress_id = Column(Integer(), primary_key=True)
-    internos_sn_id_start = Column(Integer(), nullable=False)
-    internos_sn_id_end = Column(Integer(), nullable=False)
-    externos_sn_id = Column(Integer(), nullable=False)
+    externos_sn_id_start = Column(Integer(), nullable=False)
+    externos_sn_id_end = Column(Integer(), nullable=False)
+    internos_sn_id = Column(Integer(), nullable=False)
 
 
 class PossibleMatches(Base, BaseTable):

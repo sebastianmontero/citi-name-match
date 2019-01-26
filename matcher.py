@@ -7,77 +7,49 @@ from fuzzywuzzy import fuzz
 from dao_objects import PossibleMatches, Progress
 
 
-def match(self, internal, external, start_external=0):
-    print('Matching...')
-    start_time = time.time()
-    for i in range(0, len(internal)):
-        for j in range(start_external, len(external)):
-            internal_name = internal.iloc[i]['nombre']
-            external_name = external.iloc[j]['nombre']
-            score = fuzz.token_set_ratio(
-                internal_name, external_name)
-            if j % 20000 == 0:
-                print('Internal Progress: {}/{} ({:.0%}) External progress: {}/{} ({:.4%}) Running time: {}'.format(
-                    i, len(internal), i/len(internal), j, len(external), j/len(external), self._get_elapsed_time(start_time)))
-            if score > 0:
-                print(score, internal_name, external_name)
-        start_external = 0
-
-
-class Matcher(object):
-
-    def __init__(self):
-        self._engine = DBManager.get_engine()
+class MatchWorker(object):
 
     def load_internal_clients(self):
         sql = ("select internos_sn_id, " +
                "nombre " +
                "from internos_sn ")
-        return pd.read_sql(sql, con=self._engine)
+        return pd.read_sql(sql, con=DBManager.get_engine())
 
-    def load_external_clients(self):
+    def load_external_clients(self, limit, offset):
         sql = ("select externos_sn_id, " +
                "nombre " +
-               "from externos_sn")
-        return pd.read_sql(sql, con=self._engine)
-
-    def match(self):
-        internal = self.load_internal_clients()
-        external = self.load_external_clients()
-        with ProcessPoolExecutor(max_workers=2) as executor:
-            future = executor.submit(match, internal, external)
-            """ future2 = executor.submit(test, 'adios') """
-            print('Is running', future.running())
-            sleep(5)
-            """ print(future.result())
-            print(future2.result()) """
+               "from externos_sn " +
+               "limit {} offset {}".format(limit, offset))
+        return pd.read_sql(sql, con=DBManager.get_engine())
 
     def test(self, msg):
         print(msg)
         return msg
 
-    def _match(self, internal, external, start_external=0):
+    def match(self, start_external, end_external, start_internal=0):
         print('Matching...')
-        with self._engine.connect() as conn:
+        internal = self.load_internal_clients()
+        external = self.load_external_clients(
+            end_external - start_external, start_external)
+        with DBManager.get_engine().connect() as conn:
             start_time = time.time()
-            for i in range(0, len(internal)):
-                for j in range(start_external, len(external)):
-                    internal_name = internal.iloc[i]['nombre']
-                    external_name = external.iloc[j]['nombre']
+            for i in range(0, len(external)):
+                for j in range(start_internal, len(internal)):
+                    external_name = external.iloc[i]['nombre']
+                    internal_name = internal.iloc[j]['nombre']
                     score = fuzz.token_set_ratio(
                         internal_name, external_name)
-                    if j % 20000 == 0:
-                        print('Internal Progress: {}/{} ({:.0%}) External progress: {}/{} ({:.4%}) Running time: {}'.format(
-                            i, len(internal), i/len(internal), j, len(external), j/len(external), self._get_elapsed_time(start_time)))
-                    if score > 0:
+                    if score > 85:
                         print(score, internal_name, external_name)
                         conn.execute(PossibleMatches.get_table().insert().values(
-                            internos_sn_id=internal.iloc[i]['internos_sn_id'].item(
+                            internos_sn_id=internal.iloc[j]['internos_sn_id'].item(
                             ),
-                            externos_sn_id=external.iloc[j]['externos_sn_id'].item(
+                            externos_sn_id=external.iloc[i]['externos_sn_id'].item(
                             ),
                             match_score=score))
-                start_external = 0
+                print('External progress: {}/{} ({:.4%}) Running time: {}'.format(
+                    i, len(external), i/len(external), self._get_elapsed_time(start_time)))
+                start_internal = 0
 
     def _get_elapsed_time(self, start_time):
         seconds = int(time.time() - start_time)
@@ -104,9 +76,15 @@ class Matcher(object):
         return msg """
 
 
-matcher = Matcher()
-matcher.match()
-
+matcher = MatchWorker()
+matcher.match(500, 550)
+""" with ProcessPoolExecutor(max_workers=2) as executor:
+    future = executor.submit(matcher.match)
+    future2 = executor.submit(matcher.match)
+    print('Is running', future.running())
+    print('Is running', future2.running())
+    sleep(5)
+ """
 """ test = Test()
 test.run() """
 
