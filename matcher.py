@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from db_manager import DBManager
 from sqlalchemy.sql import text
 from fuzzywuzzy import fuzz
-from dao_objects import PossibleMatches, Progress
+from objects import PossibleMatches, Progress
 
 
 class MatchWorker(object):
@@ -87,11 +87,11 @@ class WorkerManager(object):
                     matcher.match, start, start + externals_per_worker))
 
 
-manager = WorkerManager(3)
-manager.run()
+""" manager = WorkerManager(3)
+manager.run() """
 
-""" matcher = MatchWorker()
-matcher.match(500, 550) """
+matcher = MatchWorker()
+matcher.match(0, 700000)
 """ with ProcessPoolExecutor(max_workers=2) as executor:
     future = executor.submit(matcher.match)
     future2 = executor.submit(matcher.match)

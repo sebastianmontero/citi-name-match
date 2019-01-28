@@ -23,3 +23,18 @@ class PossibleMatches(Base, BaseTable):
     internos_sn_id = Column(Integer(), primary_key=True)
     externos_sn_id = Column(Integer(), primary_key=True)
     match_score = Column(Integer(), nullable=False)
+
+
+class InternosSN(Base, BaseTable):
+    __tablename__ = 'internos_sn'
+    internos_sn_id = Column(Integer(), primary_key=True)
+    nombre = Column(String(), nullable=False)
+    agrupadores = Column(String(), nullable=False)
+    tipos = Column(String(), nullable=False)
+
+
+class ExternosSN(Base, BaseTable):
+    __tablename__ = 'externos_sn'
+    externos_sn_id = Column(Integer(), primary_key=True)
+    nombre = Column(String(), nullable=False)
+    clabes = Column(String(), nullable=False)
