@@ -25,6 +25,14 @@ class PossibleMatches(Base, BaseTable):
     match_score = Column(Integer(), nullable=False)
 
 
+class PossibleMatchesDoc(Base, BaseTable):
+    __tablename__ = 'possible_matches_doc'
+    clabe_externo = Column(String(), primary_key=True)
+    nombre_interno = Column(String(), primary_key=True)
+    agrupadores = Column(String(), nullable=False)
+    score = Column(Numeric(precision=15, scale=14), nullable=False)
+
+
 class InternosSN(Base, BaseTable):
     __tablename__ = 'internos_sn'
     internos_sn_id = Column(Integer(), primary_key=True)

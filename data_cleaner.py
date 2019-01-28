@@ -81,7 +81,7 @@ class DataCleaner(object):
                 'nombre_largo': nombre_largo,
                 'nombre_corto': nombre_corto
             })
-        print('Finished cleaning data. Updating external clients table...')
+        print('Finished cleaning data.')
         return self._create_single_name_externals(updates)
 
     def _create_single_name_internals(self, internals):
@@ -128,7 +128,7 @@ class DataCleaner(object):
         return list(internal_map.values())
 
     def _create_single_name_externals(self, externals):
-        print('Updating externos sn')
+        print('Creating single name externos...')
         external_map = {}
         for external in externals:
             nombre_largo = external['nombre_largo']
