@@ -8,6 +8,7 @@ from data_cleaner import DataCleaner
 from document_processor import DocumentProcessor
 from dao.externos_dao import ExternosDao
 from dao.internos_dao import InternosDao
+from dao.possible_matches_doc_dao import PossibleMatchesDocDao
 
 
 class DocumentSearch(object):
@@ -116,17 +117,30 @@ class DocumentSearchExercise(object):
             doc_search = DocumentSearch(external_names, 'external_names')
             internals = InternosDao.select(conn)
             internal_sn = self._cleaner.clean_internal_clients(internals)
-            internal_names = self._cleaner.extract_names(internal_sn)
-            for i in range(10000):
-                internal_name = random.choice(internal_names)
-                results = doc_search.search(internal_name, .87)
+            num_internals = len(internal_sn)
+            for i, internal in enumerate(internal_sn):
+                internal_name = internal['nombre']
+                if i % 500 == 0:
+                    print('Progress: {}/{} ({:2%})', i,
+                          num_internals, i/num_internals)
+                results = doc_search.search(internal_name, .85)
                 if len(results) > 0:
+                    matches = []
                     print('For internal: {} Results:'.format(internal_name))
                     for result in results:
                         external = external_sn[result['index']]
-
+                        external_name = external['nombre']
                         print(
-                            '\t{} Clabes:{} / Score: {}'.format(external['nombre'], external['clabes'], result['score']))
+                            '\t{} / Score: {}'.format(external_name, result['score']))
+                        for clabe in external['clabes'].split(';'):
+                            matches.append({
+                                'nombre_interno': internal_name,
+                                'nombre_externo': external_name,
+                                'clabe_externo': clabe,
+                                'agrupadores': internal['agrupadores'],
+                                'score': result['score'].item()
+                            })
+                    PossibleMatchesDocDao.insert(conn, matches)
 
 
 exercise = DocumentSearchExercise()
