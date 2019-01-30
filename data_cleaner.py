@@ -3,53 +3,50 @@ import re
 
 class DataCleaner(object):
 
+    common_terms = ['a', 'ac', 'and', 'b', 'c', 'cv', 'd', 'de',
+                    'del', 'e', 'en', 'f', 'g', 'h', 'i', 'l', 'la', 'los', 'ltd',
+                    'm', 'n' 'o', 'of', 'p', 'plc', 's', 'sa', 'sab',
+                    'sc', 'r', 'rl', 't', 'the', 'u', 'v', 'y', ',', r'\.', '&', r'\(', r'\)']
+
+    fix_terms = [('@', 'ñ'), ("'", '')]
+
+    def __init__(self):
+        self._common_terms = [(r'\b'+term+r'\b', ' ')
+                              for term in DataCleaner.common_terms]
+
     def _clean_name(self, name):
         return name.strip(' .,/').lower()
 
-    def _remove_common_terms(self, name):
-        """ s de rl de cv """
-        """ sa[v,api,b] de cv """
-        """ s en nc de cv """
-        """de cv """
-        """sa """
-        terms = [
-            r'\s*(cia)?(compa.?ia)?(\s*s[\.\s]?(c[\.\s]?)?(p[\.\s]?r[\.\s]?)?)?\s*(de?)?\s*r[\.\s]?l[\.\s]?\s*de?\s*c[\.\s]?v[\.\s]?',
-            r'\s*(cia)?(compa.?ia)?\s*s[\.\s]?[acs][\.\s]?(b[\.\s]?)?(p[\.\s]?i[\.\s]?)?(v[\.\s]?)?\s*de?\s*c[\.\s]?v[\.\s]?',
-            r'\s*(cia)?(compa.?ia)?\s*(s[\.\s]?)?(en)?\s*n[\.\s]?c[\.\s]?\s*de?\s*c[\.\s]?v[\.\s]?',
-            r'\s*(cia)?(compa.?ia)?\b(de?)?\bc[\.\s]?v[\.\s]?\b',
-            r'\b(cia)?(compa.ia)?\bs[\.\s]?a[\.\s]?\b',
-            r'\bfidei?c?(om)?(omiso(s)?)?\b',
-            r'\b(gpo|grupo)\s*finan?(ciero)?\b',
-            r'^[0-9\s]+$',
-            r'\bm.xico\b',
-            r'\bde\b',
-            r'\bdel\b',
-            r'\bla\b',
-            r'\by\b'
-        ]
-
+    def _replace_terms(self, name, terms):
         for term in terms:
-            name = re.sub(term, ' ', name)
+            name = re.sub(term[0], term[1], name)
         return name.strip()
 
-    def process_name(self, name, remove_common_terms=False):
+    def _remove_common_terms(self, name):
+        return self._replace_terms(name, self._common_terms)
+
+    def _fix_terms(self, name):
+        return self._replace_terms(name, DataCleaner.fix_terms)
+
+    def process_name(self, name):
         name = self._clean_name(name)
-        if remove_common_terms:
-            name = self._remove_common_terms(name)
+        name = self._fix_terms(name)
+        name = self._remove_common_terms(name)
+
         return name
 
     def extract_names(self, names_sn):
         return [name_sn['nombre'] for name_sn in names_sn]
 
-    def clean_internal_clients(self, internal, remove_common_terms=False):
+    def clean_internal_clients(self, internal):
         print('Cleaning internal clients...')
         updates = []
         for row in internal:
-            nombre = self.process_name(row['nombre'], remove_common_terms)
+            nombre = self.process_name(row['nombre'])
             nombre = re.sub(r'^agrupador:?\s*', '', nombre)
-            grupo = self.process_name(row['grupo'], remove_common_terms)
+            grupo = self.process_name(row['grupo'])
             agrupador = self.process_name(
-                row['agrupador'], remove_common_terms)
+                row['agrupador'])
 
             if grupo == 'por clasificar' or grupo == '':
                 grupo = nombre
