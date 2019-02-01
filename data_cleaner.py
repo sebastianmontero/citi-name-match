@@ -1,10 +1,17 @@
 import re
-
+import math
+from sqlalchemy import text
+from db_manager import DBManager
+from domain.objects import InternosSN, ExternosSN
+from dao.internos_dao import InternosDao
+from dao.externos_all_dao import ExternosAllDao
+from dao.internos_sn_dao import InternosSNDao
+from dao.externos_sn_dao import ExternosSNDao
 
 class DataCleaner(object):
 
     fix_terms = [
-        ('@', 'ñ'),
+        ('@', 'n'),
         ("'", ''),
         ("&", ' and '),
         (r"\bbanco\b", 'bank'),
@@ -51,7 +58,9 @@ class DataCleaner(object):
             r'\bof\b',
             r'\bltd\b',
             r'\bthe\b',
-            r'\bempleados\b'
+            r'\bempleados\b',
+            r'\bxborder\b',
+            r'\s+'
         ]
 
     def __init__(self):
@@ -84,6 +93,19 @@ class DataCleaner(object):
     def extract_names(self, names_sn):
         return [name_sn['nombre'] for name_sn in names_sn]
 
+    def clean(self):
+        with DBManager.get_engine().connect() as conn:
+            print('Selecting internal clients...')
+            internals = InternosDao.select(conn)
+            internal_sn = self.clean_internal_clients(internals)
+            self._truncate_single_name_internals(conn)
+            self._insert_single_name_internals(conn, internal_sn)
+            print('Selecting external clients...')
+            externals = ExternosAllDao.select(conn)
+            external_sn = self.clean_external_clients(externals)
+            self._truncate_single_name_externals(conn)
+            self._insert_single_name_externals(conn, external_sn)
+
     def clean_internal_clients(self, internal):
         print('Cleaning internal clients...')
         updates = []
@@ -111,18 +133,11 @@ class DataCleaner(object):
         print('Cleaning external clients...')
         updates = []
         for row in external:
-            nombre_largo = row['nombre_largo']
-            nombre_corto = row['nombre_corto']
-
-            nombre_largo = self.process_name(nombre_largo)
-            if nombre_corto != row['nombre_largo']:
-                nombre_corto = self.process_name(nombre_corto)
-            else:
-                nombre_corto = nombre_largo
+            nombre = row['nombre']
+            nombre = self.process_name(nombre)
             updates.append({
                 'clabe': row['clabe'],
-                'nombre_largo': nombre_largo,
-                'nombre_corto': nombre_corto
+                'nombre': nombre
             })
         print('Finished cleaning data.')
         return self._create_single_name_externals(updates)
@@ -174,29 +189,44 @@ class DataCleaner(object):
         print('Creating single name externos...')
         external_map = {}
         for external in externals:
-            nombre_largo = external['nombre_largo']
-            nombre_corto = external['nombre_corto']
+            nombre = external['nombre']
             clabe = external['clabe']
-            levels = [
-                {
-                    'nombre': nombre_largo,
-                    'clabe': clabe
-                },
-                {
-                    'nombre': nombre_corto,
-                    'clabe': clabe
-                }
-            ]
-            for level in levels:
-                lnombre = level['nombre']
-                lclabe = level['clabe']
-                if len(lnombre) > 0:
-                    if lnombre not in external_map:
-                        external_map[lnombre] = {
-                            'nombre': lnombre,
-                            'clabes': lclabe
-                        }
-                    else:
-                        external_map[lnombre]['clabes'] += ';' + clabe
+            if len(nombre) > 0:
+                if nombre not in external_map:
+                    external_map[nombre] = {
+                        'nombre': nombre,
+                        'clabes': clabe
+                    }
+                else:
+                    if external_map[nombre]['clabes'].find(clabe) == -1:
+                        external_map[nombre]['clabes'] += ';' + clabe
 
         return list(external_map.values())
+
+
+    def _truncate_single_name_internals(self, conn):
+        print('Deleting internos_sn...')
+        sql = text("delete from internos_sn")
+        conn.execute(sql)
+
+    def _truncate_single_name_externals(self, conn):
+        print('Deleting externos_sn...')
+        sql = text("delete from externos_sn")
+        conn.execute(sql)
+    
+    def _insert_single_name_internals(self, conn, inserts):
+        print('Inserting internos_sn...')
+        conn.execute(InternosSN.get_table().insert(), inserts)
+
+    def _insert_single_name_externals(self, conn, inserts):
+        print('Inserting externos_sn...')
+        slice_size = 50000
+        num_slices = math.ceil(len(inserts)/slice_size)
+        for i in range(num_slices):
+            conn.execute(ExternosSN.get_table().insert(),
+                         inserts[i*slice_size:(i + 1)*slice_size])
+
+
+cleaner = DataCleaner()
+cleaner.clean()
+
