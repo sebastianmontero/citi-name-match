@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from db_manager import DBManager
 from sqlalchemy.sql import text
 from fuzzywuzzy import fuzz
-from objects import PossibleMatches, Progress
+from domain.objects import PossibleMatches, Progress
 
 
 class MatchWorker(object):

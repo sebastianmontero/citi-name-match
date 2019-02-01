@@ -1,8 +1,10 @@
 import pathlib
 import random
+import re
 from gensim.corpora import Dictionary
 from gensim.models import TfidfModel
 from gensim.similarities import Similarity
+from fuzzywuzzy import fuzz
 from db_manager import DBManager
 from data_cleaner import DataCleaner
 from document_processor import DocumentProcessor
@@ -13,9 +15,12 @@ from dao.possible_matches_doc_dao import PossibleMatchesDocDao
 
 class DocumentSearch(object):
 
-    def __init__(self, documents, id):
+    def __init__(self, documents, id, domain_terms=[]):
         self._processor = DocumentProcessor()
+        self._cleaner = DataCleaner()
         self._documents = documents
+        self._domain_terms = [(re.compile(r'\b'+domain_term+r'\b'), '')
+                              for domain_term in domain_terms]
         self._id = id
         self._processed_docs = None
         self._dictionary = None
@@ -97,10 +102,27 @@ class DocumentSearch(object):
         processed_doc = self._processor.process_document(doc)
         bow = self._doc2bow(processed_doc)
         matches = self._get_similarity()[self._get_tfidf_model()[bow]]
-        indexes = (matches > limit).nonzero()[0]
-        results = [{'index': index, 'score': matches[index]}
-                   for index in indexes]
+        results = self._adjust_for_domain_terms(matches, doc, limit)
         results.sort(key=lambda r: r['score'], reverse=True)
+        return results
+
+    def _adjust_for_domain_terms(self, matches, doc, limit):
+        indexes = (matches > limit).nonzero()[0]
+        domain_terms = [
+            term for term in self._domain_terms if term[0].search(doc)]
+        stripped_doc = self._cleaner.replace_terms(doc, domain_terms)
+        results = []
+        for index in indexes:
+            score = matches[index].item()
+            if len(domain_terms) > 0:
+                match = self._documents[index]
+                stripped_match = self._cleaner.replace_terms(
+                    match, domain_terms)
+                if len(match) != len(stripped_match):
+                    score = fuzz.token_set_ratio(
+                        stripped_doc, stripped_match)/100
+            if score > limit:
+                results = [{'index': index, 'score': score}]
         return results
 
 
@@ -108,21 +130,38 @@ class DocumentSearchExercise(object):
 
     def __init__(self):
         self._cleaner = DataCleaner()
+        self._domain_terms = [
+            'bank',
+            'services',
+            'fondo',
+            'national',
+            'grupo',
+            'ahorro',
+            'corporation',
+            'international',
+            'inc',
+            'inmobilaria',
+            'company',
+            'operadora',
+            'comercial',
+            'industrial'
+        ]
 
     def search(self):
         with DBManager.get_engine().connect() as conn:
             externals = ExternosDao.select(conn)
             external_sn = self._cleaner.clean_external_clients(externals)
             external_names = self._cleaner.extract_names(external_sn)
-            doc_search = DocumentSearch(external_names, 'external_names')
+            doc_search = DocumentSearch(
+                external_names, 'external_names', domain_terms=self._domain_terms)
             internals = InternosDao.select(conn)
             internal_sn = self._cleaner.clean_internal_clients(internals)
             num_internals = len(internal_sn)
             for i, internal in enumerate(internal_sn):
                 internal_name = internal['nombre']
                 if i % 500 == 0:
-                    print('Progress: {}/{} ({:2%})', i,
-                          num_internals, i/num_internals)
+                    print('Progress: {}/{} ({:2%})'.format(i,
+                                                           num_internals, i/num_internals))
                 results = doc_search.search(internal_name, .85)
                 if len(results) > 0:
                     matches = []
@@ -138,7 +177,7 @@ class DocumentSearchExercise(object):
                                 'nombre_externo': external_name,
                                 'clabe_externo': clabe,
                                 'agrupadores': internal['agrupadores'],
-                                'score': result['score'].item()
+                                'score': result['score']
                             })
                     PossibleMatchesDocDao.insert(conn, matches)
 

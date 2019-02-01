@@ -9,7 +9,8 @@ class InternosDao(object):
                    "nombre, "
                    "grupo, "
                    "agrupador "
-                   "from internos ")
+                   "from internos "
+                   "where nombre like '%bank%'")
         return conn.execute(sql).fetchall()
 
     @staticmethod

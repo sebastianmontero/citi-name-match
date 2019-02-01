@@ -25,8 +25,8 @@ class DocumentStats(object):
             print('Processing documents...')
             self._processed_docs = self._processor.process_documents(
                 self._documents)
-            self._processed_docs = [[
-                word for word_list in self._processed_docs for word in word_list]]
+            """ self._processed_docs = [[
+                word for word_list in self._processed_docs for word in word_list]] """
         return self._processed_docs
 
     def _get_dictionary(self):
@@ -62,6 +62,16 @@ class DocumentStats(object):
                 return
             print('{} : {}'.format(self._id2word(b[0]), b[1]))
 
+    def top_common_words_per_doc(self, limit=1000):
+
+        dfs = self._get_dictionary().dfs
+        dfs_list = [(self._id2word(key), value) for key, value in dfs.items()]
+        dfs_list.sort(key=lambda b: b[1], reverse=True)
+        for index, b in enumerate(dfs_list):
+            if index >= limit:
+                return
+            print('{} : {}'.format(b[0], b[1]))
+
 
 class DocumentStatsExercise(object):
 
@@ -76,9 +86,8 @@ class DocumentStatsExercise(object):
             internals = InternosDao.select(conn)
             internal_sn = self._cleaner.clean_internal_clients(internals)
             internal_names = self._cleaner.extract_names(internal_sn)
-            print(internal_names)
             doc_stats = DocumentStats(internal_names, 'internal_names_stats')
-            """ doc_stats.top_common_words(10000) """
+            doc_stats.top_common_words_per_doc(1000)
 
 
 exercise = DocumentStatsExercise()
