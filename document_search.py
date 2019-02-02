@@ -8,9 +8,10 @@ from fuzzywuzzy import fuzz
 from db_manager import DBManager
 from data_cleaner import DataCleaner
 from document_processor import DocumentProcessor
-from dao.externos_dao import ExternosDao
-from dao.internos_dao import InternosDao
-from dao.possible_matches_doc_dao import PossibleMatchesDocDao
+from dao.externos_sn_dao import ExternosSNDao
+from dao.internos_sn_dao import InternosSNDao
+from dao.possible_matches_doc_ext_idx_dao import PossibleMatchesDocExtIdxDao
+from dao.possible_matches_doc_int_idx_dao import PossibleMatchesDocIntIdxDao
 
 
 class DocumentSearch(object):
@@ -102,25 +103,23 @@ class DocumentSearch(object):
         processed_doc = self._processor.process_document(doc)
         bow = self._doc2bow(processed_doc)
         matches = self._get_similarity()[self._get_tfidf_model()[bow]]
-        results = self._adjust_for_domain_terms(matches, doc, limit)
+        results = self._fuzzy_filter(matches, doc, limit)
         results.sort(key=lambda r: r['score'], reverse=True)
         return results
 
-    def _adjust_for_domain_terms(self, matches, doc, limit):
-        indexes = (matches > limit).nonzero()[0]
+    def _fuzzy_filter(self, matches, doc, limit):
+        indexes = (matches > (limit/100)).nonzero()[0]
         domain_terms = [
             term for term in self._domain_terms if term[0].search(doc)]
         stripped_doc = self._cleaner.replace_terms(doc, domain_terms)
         results = []
         for index in indexes:
-            score = matches[index].item()
+            match = self._documents[index]
             if len(domain_terms) > 0:
-                match = self._documents[index]
-                stripped_match = self._cleaner.replace_terms(
+                match = self._cleaner.replace_terms(
                     match, domain_terms)
-                if len(match) != len(stripped_match):
-                    score = fuzz.token_set_ratio(
-                        stripped_doc, stripped_match)/100
+            score = fuzz.token_set_ratio(
+                stripped_doc, match)
             if score > limit:
                 results = [{'index': index, 'score': score}]
         return results
@@ -147,39 +146,72 @@ class DocumentSearchExercise(object):
             'industrial'
         ]
 
-    def search(self):
+    def search(self, external_idx=False):
         with DBManager.get_engine().connect() as conn:
-            externals = ExternosDao.select(conn)
-            external_sn = self._cleaner.clean_external_clients(externals)
-            external_names = self._cleaner.extract_names(external_sn)
-            doc_search = DocumentSearch(
-                external_names, 'external_names', domain_terms=self._domain_terms)
-            internals = InternosDao.select(conn)
-            internal_sn = self._cleaner.clean_internal_clients(internals)
-            num_internals = len(internal_sn)
-            for i, internal in enumerate(internal_sn):
-                internal_name = internal['nombre']
-                if i % 500 == 0:
-                    print('Progress: {}/{} ({:2%})'.format(i,
-                                                           num_internals, i/num_internals))
-                results = doc_search.search(internal_name, .85)
-                if len(results) > 0:
-                    matches = []
-                    print('For internal: {} Results:'.format(internal_name))
-                    for result in results:
-                        external = external_sn[result['index']]
-                        external_name = external['nombre']
-                        print(
-                            '\t{} / Score: {}'.format(external_name, result['score']))
-                        for clabe in external['clabes'].split(';'):
-                            matches.append({
-                                'nombre_interno': internal_name,
-                                'nombre_externo': external_name,
-                                'clabe_externo': clabe,
-                                'agrupadores': internal['agrupadores'],
-                                'score': result['score']
-                            })
-                    PossibleMatchesDocDao.insert(conn, matches)
+            if external_idx:
+                self._searchExternalIdx(conn)
+            else:
+                self._searchInternalIdx(conn)
+
+    def _searchExternalIdx(self, conn):
+        external_sn = ExternosSNDao.select(conn)
+        external_names = self._cleaner.extract_names(external_sn)
+        doc_search = DocumentSearch(
+            external_names, 'external_names', domain_terms=self._domain_terms)
+        internal_sn = InternosSNDao.select(conn)
+        num_internals = len(internal_sn)
+        for i, internal in enumerate(internal_sn):
+            internal_name = internal['nombre']
+            if i % 500 == 0:
+                print('Progress: {}/{} ({:2%})'.format(i,
+                                                       num_internals, i/num_internals))
+            results = doc_search.search(internal_name, .85)
+            if len(results) > 0:
+                matches = []
+                print('For internal: {} Results:'.format(internal_name))
+                for result in results:
+                    external = external_sn[result['index']]
+                    print(
+                        '\t{} / Score: {}'.format(external['nombre'], result['score']))
+                    matches += self._createMatchObjs(internal,
+                                                     external, result['score'])
+                PossibleMatchesDocExtIdxDao.insert(conn, matches)
+
+    def _searchInternalIdx(self, conn):
+        internal_sn = InternosSNDao.select(conn)
+        internal_names = self._cleaner.extract_names(internal_sn)
+        doc_search = DocumentSearch(
+            internal_names, 'internal_names', domain_terms=self._domain_terms)
+        external_sn = ExternosSNDao.select(conn)
+        num_externals = len(external_sn)
+        for i, external in enumerate(external_sn):
+            external_name = external['nombre']
+            if i % 500 == 0:
+                print('Progress: {}/{} ({:2%})'.format(i,
+                                                       num_externals, i/num_externals))
+            results = doc_search.search(external_name, 85)
+            if len(results) > 0:
+                matches = []
+                print('For external: {} Results:'.format(external_name))
+                for result in results:
+                    internal = internal_sn[result['index']]
+                    print(
+                        '\t{} / Score: {}'.format(internal['nombre'], result['score']))
+                    matches += self._createMatchObjs(internal,
+                                                     external, result['score'])
+                PossibleMatchesDocIntIdxDao.insert(conn, matches)
+
+    def _createMatchObjs(self, internal, external, score):
+        matches = []
+        for clabe in external['clabes'].split(';'):
+            matches.append({
+                'nombre_interno': internal['nombre'],
+                'nombre_externo': external['nombre'],
+                'clabe_externo': clabe,
+                'agrupadores': internal['agrupadores'],
+                'score': score
+            })
+        return matches
 
 
 exercise = DocumentSearchExercise()

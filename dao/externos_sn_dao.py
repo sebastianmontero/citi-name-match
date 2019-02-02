@@ -12,6 +12,13 @@ class ExternosSNDao(object):
         return conn.execute(sql).fetchall()
 
     @staticmethod
+    def select(conn):
+        sql = text("select nombre, "
+                   "clabes "
+                   "from externos_sn ")
+        return conn.execute(sql).fetchall()
+
+    @staticmethod
     def delete(conn):
         print('Deleting externos_sn...')
         sql = text("delete from externos_sn")

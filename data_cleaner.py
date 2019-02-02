@@ -227,6 +227,6 @@ class DataCleaner(object):
                          inserts[i*slice_size:(i + 1)*slice_size])
 
 
-cleaner = DataCleaner()
+""" cleaner = DataCleaner()
 cleaner.clean()
-
+ """

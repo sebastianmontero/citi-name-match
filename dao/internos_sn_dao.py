@@ -11,6 +11,14 @@ class InternosSNDao(object):
         return conn.execute(sql).fetchall()
 
     @staticmethod
+    def select(conn):
+        sql = text("select nombre, "
+                   "agrupadores, "
+                   "tipos "
+                   "from internos_sn ")
+        return conn.execute(sql).fetchall()
+
+    @staticmethod
     def delete(conn):
         print('Deleting internos_sn...')
         sql = text("delete from internos_sn")
