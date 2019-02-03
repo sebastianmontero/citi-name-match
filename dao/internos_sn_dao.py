@@ -13,7 +13,7 @@ class InternosSNDao(object):
     @staticmethod
     def select(conn):
         sql = text("select nombre, "
-                   "agrupadores, "
+                   "agrupador_ids, "
                    "tipos "
                    "from internos_sn ")
         return conn.execute(sql).fetchall()

@@ -10,9 +10,11 @@ from dao.externos_sn_dao import ExternosSNDao
 
 class DataCleaner(object):
 
+
     fix_terms = [
-        ('@', 'n'),
-        ("'", ''),
+        ('(@|µ|ñ|;|#|?)', 'n'),
+        ('æ', 'i'),
+        ('("|=)', ' '),
         ("&", ' and '),
         (r"\bbanco\b", 'bank'),
         (r"\bservicios\b", 'services'),
@@ -26,7 +28,12 @@ class DataCleaner(object):
         (r'/|-|,', r' '),
         (r"\.(\w{2})", r' \1'),
         (r'\.(\w\b)', r'\1'),
-        (r'((^|\s)\.|\.(\s|$))', r' ')
+        (r'((^|\s)\.|\.(\s|$))', r' '),
+        (r"\b(\w+)\s+and\s+(\w{1})\b", r'\1and\2'),
+        (r"\b(\w{1})\s+and\s+(\w+)\b", r'\1and\2'),
+        (r"(\w*)\s*'\s*([\w']{2,})", r'\1\2 \1 \2 '),
+        (r"(\w*)\s*'\s*(\w{1})\b", r'\1\2 \1 '),
+        ("'", '')
     ]
 
     """ s de rl de cv """
@@ -109,23 +116,23 @@ class DataCleaner(object):
     def clean_internal_clients(self, internal):
         print('Cleaning internal clients...')
         updates = []
+        agrupador_re = re.compile(r'agrupador:?',flags=re.I)
         for row in internal:
-            nombre = self.process_name(row['nombre'])
-            nombre = re.sub(r'^agrupador:?\s*', '', nombre)
+            nombre = agrupador_re.sub('', row['nombre'])
+            nombre = self.process_name(nombre)
             grupo = self.process_name(row['grupo'])
-            agrupador = self.process_name(
-                row['agrupador'])
+            agrupador = self.process_name(row['agrupador'])
 
-            if grupo == 'por clasificar' or grupo == '':
-                grupo = nombre
-            if agrupador == 'por clasificar' or agrupador == '':
-                agrupador = grupo
-            updates.append({
-                'num_cliente': row['num_cliente'],
-                'nombre': nombre,
-                'grupo': grupo,
-                'agrupador': agrupador
-            })
+            if agrupador != 'por clasificar' and grupo != 'por clasificar':
+                if grupo == 'xborder' or grupo == 'fideicomiso':
+                    grupo = ''
+                updates.append({
+                    'num_cliente': row['num_cliente'],
+                    'nombre': nombre,
+                    'grupo': grupo,
+                    'agrupador': agrupador,
+                    'agrupador_id': row['agrupador_id']
+                })
         print('Finished cleaning data. ')
         return self._create_single_name_internals(updates)
 
@@ -149,39 +156,41 @@ class DataCleaner(object):
             nombre = internal['nombre']
             grupo = internal['grupo']
             agrupador = internal['agrupador']
+            agrupador_id = internal['agrupador_id']
             levels = [
                 {
                     'nombre': nombre,
-                    'agrupador': agrupador,
+                    'agrupador_id': agrupador_id,
                     'tipo': 'nombre'
                 },
                 {
                     'nombre': grupo,
-                    'agrupador': agrupador,
+                    'agrupador_id': agrupador_id,
                     'tipo': 'grupo'
                 },
                 {
                     'nombre': agrupador,
-                    'agrupador': agrupador,
+                    'agrupador_id': agrupador_id,
                     'tipo': 'agrupador'
                 },
             ]
             for level in levels:
                 lnombre = level['nombre']
-                lagrupador = level['agrupador']
+                lagrupador_id = str(level['agrupador_id'])
                 ltipo = level['tipo']
-                if lnombre not in internal_map:
-                    internal_map[lnombre] = {
-                        'nombre': lnombre,
-                        'agrupadores': lagrupador,
-                        'tipos': ltipo
-                    }
-                else:
-                    if internal_map[lnombre]['agrupadores'].find(lagrupador) == -1:
-                        internal_map[lnombre]['agrupadores'] += ';' + \
-                            lagrupador
-                    if internal_map[lnombre]['tipos'].find(ltipo) == -1:
-                        internal_map[lnombre]['tipos'] += ';' + ltipo
+                if len(lnombre) > 0:
+                    if lnombre not in internal_map:
+                        internal_map[lnombre] = {
+                            'nombre': lnombre,
+                            'agrupador_ids': lagrupador_id,
+                            'tipos': ltipo
+                        }
+                    else:
+                        if internal_map[lnombre]['agrupador_ids'].find(lagrupador_id) == -1:
+                            internal_map[lnombre]['agrupador_ids'] += ';' + \
+                                lagrupador_id
+                        if internal_map[lnombre]['tipos'].find(ltipo) == -1:
+                            internal_map[lnombre]['tipos'] += ';' + ltipo
 
         return list(internal_map.values())
 
@@ -227,6 +236,6 @@ class DataCleaner(object):
                          inserts[i*slice_size:(i + 1)*slice_size])
 
 
-""" cleaner = DataCleaner()
+cleaner = DataCleaner()
 cleaner.clean()
- """
+

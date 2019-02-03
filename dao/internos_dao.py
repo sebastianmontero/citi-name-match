@@ -8,9 +8,9 @@ class InternosDao(object):
         sql = text("select num_cliente, "
                    "nombre, "
                    "grupo, "
-                   "agrupador "
-                   "from internos "
-                   "where nombre like '%bank%'")
+                   "agrupador, "
+                   "agrupador_id "
+                   "from internos ")
         return conn.execute(sql).fetchall()
 
     @staticmethod

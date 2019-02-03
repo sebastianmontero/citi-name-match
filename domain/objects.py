@@ -47,7 +47,7 @@ class InternosSN(Base, BaseTable):
     __tablename__ = 'internos_sn'
     internos_sn_id = Column(Integer(), primary_key=True)
     nombre = Column(String(), nullable=False)
-    agrupadores = Column(String(), nullable=False)
+    agrupador_ids = Column(String(), nullable=False)
     tipos = Column(String(), nullable=False)
 
 
