@@ -12,7 +12,7 @@ class DataCleaner(object):
 
 
     fix_terms = [
-        ('(@|µ|ñ|;|#|?)', 'n'),
+        (r'(@|µ|ñ|;|#|\?)', 'n'),
         ('æ', 'i'),
         ('("|=)', ' '),
         ("&", ' and '),
@@ -25,7 +25,8 @@ class DataCleaner(object):
         (r"\bfid(e|ei|eicom)?\b", 'fideicomiso'),
         (r"\bgpo\b", 'grupo'),
         (r"(\(|\))", ' '),
-        (r'/|-|,', r' '),
+        (r'/|-|,|\*|:|\|', r' '),
+        (r'\.(\s|\.)*\.', r'.'),
         (r"\.(\w{2})", r' \1'),
         (r'\.(\w\b)', r'\1'),
         (r'((^|\s)\.|\.(\s|$))', r' '),
@@ -34,6 +35,10 @@ class DataCleaner(object):
         (r"(\w*)\s*'\s*([\w']{2,})", r'\1\2 \1 \2 '),
         (r"(\w*)\s*'\s*(\w{1})\b", r'\1\2 \1 '),
         ("'", '')
+    ]
+
+    final_fix_terms = [
+        (r"(?<=\b\w{1})\s+(?=\w{1}\b)", r'')
     ]
 
     """ s de rl de cv """
@@ -75,6 +80,8 @@ class DataCleaner(object):
                               for term in DataCleaner.common_terms]
         self._fix_terms = [(re.compile(term[0]), term[1])
                               for term in DataCleaner.fix_terms]
+        self._final_fix_terms = [(re.compile(term[0]), term[1])
+                              for term in DataCleaner.final_fix_terms]
 
     def _clean_name(self, name):
         return name.strip(' .,/').lower()
@@ -90,10 +97,14 @@ class DataCleaner(object):
     def _apply_fix_terms(self, name):
         return self.replace_terms(name, self._fix_terms)
 
+    def _apply_final_fix_terms(self, name):
+        return self.replace_terms(name, self._final_fix_terms)
+
     def process_name(self, name):
         name = self._clean_name(name)
         name = self._apply_fix_terms(name)
         name = self._remove_common_terms(name)
+        name = self._apply_final_fix_terms(name)
 
         return name
 
@@ -236,6 +247,6 @@ class DataCleaner(object):
                          inserts[i*slice_size:(i + 1)*slice_size])
 
 
-cleaner = DataCleaner()
-cleaner.clean()
+""" cleaner = DataCleaner()
+cleaner.clean() """
 

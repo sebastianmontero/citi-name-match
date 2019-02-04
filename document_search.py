@@ -99,30 +99,58 @@ class DocumentSearch(object):
                 self._similarity.save(str(path))
         return self._similarity
 
-    def search(self, doc, limit):
+    def search(self, doc, similarity_limit, in_dict_limit):
+        results = []
         processed_doc = self._processor.process_document(doc)
+        in_dict_percentage = self._calculate_in_dict_percentage(
+            processed_doc)
+        if in_dict_percentage < in_dict_limit:
+            return results
         bow = self._doc2bow(processed_doc)
         matches = self._get_similarity()[self._get_tfidf_model()[bow]]
-        results = self._fuzzy_filter(matches, doc, limit)
-        results.sort(key=lambda r: r['score'], reverse=True)
-        return results
-
-    def _fuzzy_filter(self, matches, doc, limit):
-        indexes = (matches > (limit/100)).nonzero()[0]
-        domain_terms = [
-            term for term in self._domain_terms if term[0].search(doc)]
+        indexes = (matches > (similarity_limit/100)).nonzero()[0]
+        domain_terms = self._domain_terms_in_doc(doc)
         stripped_doc = self._cleaner.replace_terms(doc, domain_terms)
-        results = []
+
         for index in indexes:
+            similarity = matches[index].item()
             match = self._documents[index]
             if len(domain_terms) > 0:
                 match = self._cleaner.replace_terms(
                     match, domain_terms)
-            score = fuzz.token_set_ratio(
+            token_set_ratio = fuzz.token_set_ratio(
                 stripped_doc, match)
-            if score > limit:
-                results = [{'index': index, 'score': score}]
+            if token_set_ratio >= similarity_limit:
+                partial_ratio = fuzz.partial_ratio(stripped_doc, match)
+                stripped_length = len(match)
+                results = [{
+                    'index': index,
+                    'token_set_ratio': token_set_ratio,
+                    'similarity': similarity,
+                    'partial_ratio': partial_ratio,
+                    'in_dict_percentage': in_dict_percentage,
+                    'stripped_length': stripped_length,
+                    'total': (token_set_ratio * 100) + (partial_ratio * 10) + stripped_length
+                }]
+
+        results.sort(key=lambda r: r['total'], reverse=True)
         return results
+
+    def _domain_terms_in_doc(self, doc):
+        domain_terms = [
+            term for term in self._domain_terms if term[0].search(doc)]
+        return domain_terms
+
+    def _count_words_in_dict(self, processed_doc):
+        count = 0
+        token2id = self._get_dictionary().token2id
+        for word in processed_doc:
+            if word in token2id:
+                count += 1
+        return count
+
+    def _calculate_in_dict_percentage(self, processed_doc):
+        return self._count_words_in_dict(processed_doc)/len(processed_doc)
 
 
 class DocumentSearchExercise(object):
@@ -165,19 +193,20 @@ class DocumentSearchExercise(object):
             if i % 500 == 0:
                 print('Progress: {}/{} ({:2%})'.format(i,
                                                        num_internals, i/num_internals))
-            results = doc_search.search(internal_name, .85)
+            results = doc_search.search(internal_name, 85, 0.34)
             if len(results) > 0:
                 matches = []
                 print('For internal: {} Results:'.format(internal_name))
                 for result in results:
                     external = external_sn[result['index']]
                     print(
-                        '\t{} / Score: {}'.format(external['nombre'], result['score']))
+                        '\t{} / Token set ratio: {}, Partial ratio: {}, In dict percentage:{},  '.format(external['nombre'], result['token_set_ratio'], result['partial_ratio'], result['in_dict_percentage']))
                     matches += self._createMatchObjs(internal,
-                                                     external, result['score'])
+                                                     external, result)
                 PossibleMatchesDocExtIdxDao.insert(conn, matches)
 
     def _searchInternalIdx(self, conn):
+        PossibleMatchesDocIntIdxDao.truncate(conn)
         internal_sn = InternosSNDao.select(conn)
         internal_names = self._cleaner.extract_names(internal_sn)
         doc_search = DocumentSearch(
@@ -189,27 +218,32 @@ class DocumentSearchExercise(object):
             if i % 500 == 0:
                 print('Progress: {}/{} ({:2%})'.format(i,
                                                        num_externals, i/num_externals))
-            results = doc_search.search(external_name, 85)
+            results = doc_search.search(external_name, 85, 0.34)
             if len(results) > 0:
                 matches = []
                 print('For external: {} Results:'.format(external_name))
                 for result in results:
                     internal = internal_sn[result['index']]
                     print(
-                        '\t{} / Score: {}'.format(internal['nombre'], result['score']))
+                        '\t{} / Token set ratio: {}, Partial ratio: {}, In dict percentage:{},  '.format(internal['nombre'], result['token_set_ratio'], result['partial_ratio'], result['in_dict_percentage']))
                     matches += self._createMatchObjs(internal,
-                                                     external, result['score'])
+                                                     external, result)
                 PossibleMatchesDocIntIdxDao.insert(conn, matches)
 
-    def _createMatchObjs(self, internal, external, score):
+    def _createMatchObjs(self, internal, external, result):
         matches = []
         for clabe in external['clabes'].split(';'):
             matches.append({
                 'nombre_interno': internal['nombre'],
                 'nombre_externo': external['nombre'],
                 'clabe_externo': clabe,
-                'agrupadores': internal['agrupadores'],
-                'score': score
+                'agrupador_ids': internal['agrupador_ids'],
+                'token_set_ratio': result['token_set_ratio'],
+                'similarity': result['similarity'],
+                'partial_ratio': result['partial_ratio'],
+                'in_dict_percentage': result['in_dict_percentage'],
+                'stripped_length': result['stripped_length'],
+                'total': result['total']
             })
         return matches
 

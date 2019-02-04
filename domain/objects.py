@@ -30,8 +30,13 @@ class PossibleMatchesDocIntIdx(Base, BaseTable):
     nombre_interno = Column(String(), primary_key=True)
     nombre_externo = Column(String(), primary_key=True)
     clabe_externo = Column(String(), nullable=False)
-    agrupadores = Column(String(), nullable=False)
-    score = Column(SmallInteger(), nullable=False)
+    agrupador_ids = Column(String(), nullable=False)
+    token_set_ratio = Column(SmallInteger(), nullable=False)
+    partial_ratio = Column(SmallInteger(), nullable=False)
+    stripped_length = Column(SmallInteger(), nullable=False)
+    total = Column(Integer(), nullable=False)
+    similarity = Column(Numeric(precision=10, scale=9), nullable=False)
+    in_dict_percentage = Column(Numeric(precision=5, scale=4), nullable=False)
 
 
 class PossibleMatchesDocExtIdx(Base, BaseTable):
@@ -39,8 +44,13 @@ class PossibleMatchesDocExtIdx(Base, BaseTable):
     nombre_interno = Column(String(), primary_key=True)
     nombre_externo = Column(String(), primary_key=True)
     clabe_externo = Column(String(), nullable=False)
-    agrupadores = Column(String(), nullable=False)
-    score = Column(SmallInteger(), nullable=False)
+    agrupador_ids = Column(String(), nullable=False)
+    token_set_ratio = Column(SmallInteger(), nullable=False)
+    partial_ratio = Column(SmallInteger(), nullable=False)
+    stripped_length = Column(SmallInteger(), nullable=False)
+    total = Column(Integer(), nullable=False)
+    similarity = Column(Numeric(precision=10, scale=9), nullable=False)
+    in_dict_percentage = Column(Numeric(precision=5, scale=4), nullable=False)
 
 
 class InternosSN(Base, BaseTable):
