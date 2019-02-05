@@ -38,6 +38,8 @@ class DataCleaner(object):
     ]
 
     final_fix_terms = [
+        (r'(\w{1}\s+)\bs\s*n?\s*c\b',r'\1 '),
+        (r'(\w{1}\s+)\bof\b',r'\1 '),
         (r"(?<=\b\w{1})\s+(?=\w{1}\b)", r'')
     ]
 
@@ -54,7 +56,6 @@ class DataCleaner(object):
             r'\b(cia)?(compa.ia)?\bs[\.\s]?a[\.\s]?\b',
             r'\bs\s*a\s*c\s*v\b',
             r'\bs\s*(de?)?\s*r\s*l(\s*m\s*i)?\s*(de?)?\s*(cv)?\b',
-            r'\w{1}\s+\bs\s*n?\s*c\b',
             r'\bs\s*(de?)?\s*p\s*r\s*(de?)?\s*r\s*(i|l)\s*(cv)?\b',
             r'\bs\s*(de?)?\s*s\s*s\b',
             r'\bs\s*i\s*i\s*d\b',
@@ -68,7 +69,6 @@ class DataCleaner(object):
             r'\bdel\b',
             r'\bla\b',
             r'\by\b',
-            r'\w{1}\s+\bof\b',
             r'\bltd\b',
             r'\bthe\b',
             r'\bempleados\b',
