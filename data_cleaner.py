@@ -53,9 +53,10 @@ class DataCleaner(object):
             r'\s*(cia)?(compa.?ia)?\b(de?)?\bc[\.\s]?v[\.\s]?\b',
             r'\b(cia)?(compa.ia)?\bs[\.\s]?a[\.\s]?\b',
             r'\bs\s*a\s*c\s*v\b',
-            r'\bs\s*d?\s*r\s*l(\s*m\s*i)?\b',
-            r'\bs\s*n?\s*c\b',
-            r'\bs\s*p\s*r\s*r\s*(i|l)\b',
+            r'\bs\s*(de?)?\s*r\s*l(\s*m\s*i)?\s*(de?)?\s*(cv)?\b',
+            r'\w{1}\s+\bs\s*n?\s*c\b',
+            r'\bs\s*(de?)?\s*p\s*r\s*(de?)?\s*r\s*(i|l)\s*(cv)?\b',
+            r'\bs\s*(de?)?\s*s\s*s\b',
             r'\bs\s*i\s*i\s*d\b',
             r'\bs\s*i\s*r\s*v\b',
             r'\bs\s+p\s+a\b',
@@ -67,7 +68,7 @@ class DataCleaner(object):
             r'\bdel\b',
             r'\bla\b',
             r'\by\b',
-            r'\bof\b',
+            r'\w{1}\s+\bof\b',
             r'\bltd\b',
             r'\bthe\b',
             r'\bempleados\b',
@@ -118,11 +119,11 @@ class DataCleaner(object):
             internal_sn = self.clean_internal_clients(internals)
             self._truncate_single_name_internals(conn)
             self._insert_single_name_internals(conn, internal_sn)
-            print('Selecting external clients...')
+            """ print('Selecting external clients...')
             externals = ExternosAllDao.select(conn)
             external_sn = self.clean_external_clients(externals)
             self._truncate_single_name_externals(conn)
-            self._insert_single_name_externals(conn, external_sn)
+            self._insert_single_name_externals(conn, external_sn) """
 
     def clean_internal_clients(self, internal):
         print('Cleaning internal clients...')

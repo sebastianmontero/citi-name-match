@@ -32,11 +32,28 @@ class PossibleMatchesDocIntIdx(Base, BaseTable):
     clabe_externo = Column(String(), nullable=False)
     agrupador_ids = Column(String(), nullable=False)
     token_set_ratio = Column(SmallInteger(), nullable=False)
+    ratio = Column(SmallInteger(), nullable=False)
     partial_ratio = Column(SmallInteger(), nullable=False)
     stripped_length = Column(SmallInteger(), nullable=False)
     total = Column(Integer(), nullable=False)
     similarity = Column(Numeric(precision=10, scale=9), nullable=False)
     in_dict_percentage = Column(Numeric(precision=5, scale=4), nullable=False)
+
+
+class FinalMatches(Base, BaseTable):
+    __tablename__ = 'final_matches'
+    clabe = Column(String(), primary_key=True)
+    agrupador_id = Column(Integer(), primary_key=True)
+    nombre_interno = Column(String(), nullable=False)
+    nombre_externo = Column(String(), nullable=False)
+    token_set_ratio = Column(SmallInteger(), nullable=False)
+    ratio = Column(SmallInteger(), nullable=False)
+    partial_ratio = Column(SmallInteger(), nullable=False)
+    stripped_length = Column(SmallInteger(), nullable=False)
+    total = Column(Integer(), nullable=False)
+    similarity = Column(Numeric(precision=10, scale=9), nullable=False)
+    in_dict_percentage = Column(Numeric(precision=5, scale=4), nullable=False)
+    count = Column(Integer(), nullable=False)
 
 
 class PossibleMatchesDocExtIdx(Base, BaseTable):
@@ -47,6 +64,7 @@ class PossibleMatchesDocExtIdx(Base, BaseTable):
     agrupador_ids = Column(String(), nullable=False)
     token_set_ratio = Column(SmallInteger(), nullable=False)
     partial_ratio = Column(SmallInteger(), nullable=False)
+    ratio = Column(SmallInteger(), nullable=False)
     stripped_length = Column(SmallInteger(), nullable=False)
     total = Column(Integer(), nullable=False)
     similarity = Column(Numeric(precision=10, scale=9), nullable=False)

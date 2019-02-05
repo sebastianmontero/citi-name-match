@@ -122,16 +122,18 @@ class DocumentSearch(object):
                 stripped_doc, match)
             if token_set_ratio >= similarity_limit:
                 partial_ratio = fuzz.partial_ratio(stripped_doc, match)
+                ratio = fuzz.ratio(stripped_doc, match)
                 stripped_length = len(match)
-                results = [{
+                results.append({
                     'index': index,
                     'token_set_ratio': token_set_ratio,
                     'similarity': similarity,
                     'partial_ratio': partial_ratio,
+                    'ratio': ratio,
                     'in_dict_percentage': in_dict_percentage,
                     'stripped_length': stripped_length,
-                    'total': (token_set_ratio * 100) + (partial_ratio * 10) + stripped_length
-                }]
+                    'total': (token_set_ratio * 1000) + (partial_ratio * 100) + (ratio * 10) + stripped_length
+                })
 
         results.sort(key=lambda r: r['total'], reverse=True)
         return results
@@ -171,7 +173,17 @@ class DocumentSearchExercise(object):
             'company',
             'operadora',
             'comercial',
-            'industrial'
+            'industrial',
+            'seguridad',
+            'privada',
+            'fundacion',
+            'administrativos',
+            'hoteles',
+            'administradora',
+            'tiendas',
+            'integrales',
+            'corporativo',
+            'universidad'
         ]
 
     def search(self, external_idx=False):
@@ -225,7 +237,15 @@ class DocumentSearchExercise(object):
                 for result in results:
                     internal = internal_sn[result['index']]
                     print(
-                        '\t{} / Token set ratio: {}, Partial ratio: {}, In dict percentage:{},  '.format(internal['nombre'], result['token_set_ratio'], result['partial_ratio'], result['in_dict_percentage']))
+                        '\t{} / Token set ratio: {}, Partial ratio: {}, Ratio: {}, In dict percentage:{}, Total:{}  '
+                            .format(
+                                internal['nombre'], 
+                                result['token_set_ratio'], 
+                                result['partial_ratio'], 
+                                result['ratio'], 
+                                result['in_dict_percentage'],
+                                result['total']
+                            ))
                     matches += self._createMatchObjs(internal,
                                                      external, result)
                 PossibleMatchesDocIntIdxDao.insert(conn, matches)
@@ -240,6 +260,7 @@ class DocumentSearchExercise(object):
                 'agrupador_ids': internal['agrupador_ids'],
                 'token_set_ratio': result['token_set_ratio'],
                 'similarity': result['similarity'],
+                'ratio': result['ratio'],
                 'partial_ratio': result['partial_ratio'],
                 'in_dict_percentage': result['in_dict_percentage'],
                 'stripped_length': result['stripped_length'],

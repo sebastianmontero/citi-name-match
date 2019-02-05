@@ -10,7 +10,8 @@ class InternosDao(object):
                    "grupo, "
                    "agrupador, "
                    "agrupador_id "
-                   "from internos ")
+                   "from internos "
+                   "where agrupador_id != 1")
         return conn.execute(sql).fetchall()
 
     @staticmethod
